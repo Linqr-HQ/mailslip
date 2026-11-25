@@ -99,8 +99,8 @@ export const useMailStore = create<MailState>((set, get, api) => ({
       params.set("folder", folder);
       const res = await fetch(`/api/mail/messages?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to refresh messages");
-      const data = await res.json();
-      set({ messages: data.messages });
+      const data: MailMessageSummary[] = await res.json();
+      set({ messages: data });
       set({ isRefreshing: false });
     } catch (error) {
       console.error("Failed to refresh messages", error);
