@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { afterEach, beforeEach, describe, test } from "node:test";
+import assert from "node:assert/strict";
 import { useMailStore } from "./src/stores/mail-store";
 
 type Message = {
@@ -25,12 +26,30 @@ const inbox: Message[] = [
 
 const originalFetch = globalThis.fetch;
 
-test.describe("mail store refreshMessages", () => {
-  test.beforeEach(() => {
+function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const tick = () => {
+      if (predicate()) {
+        resolve();
+        return;
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        reject(new Error("Timed out waiting for condition"));
+        return;
+      }
+      setTimeout(tick, 10);
+    };
+    tick();
+  });
+}
+
+describe("mail store refreshMessages", () => {
+  beforeEach(() => {
     useMailStore.setState({ messages: [], isRefreshing: false });
   });
 
-  test.afterEach(() => {
+  afterEach(() => {
     globalThis.fetch = originalFetch;
   });
 
@@ -57,13 +76,13 @@ test.describe("mail store refreshMessages", () => {
 
     const pending = useMailStore.getState().refreshMessages();
 
-    await expect.poll(() => useMailStore.getState().isRefreshing).toBe(true);
+    await waitFor(() => useMailStore.getState().isRefreshing);
 
     releaseMessages(inbox);
     await pending;
 
-    expect(requestedUrls.some((url) => url.includes("/api/mail/messages"))).toBe(true);
-    await expect.poll(() => useMailStore.getState().messages).toEqual(inbox);
-    await expect.poll(() => useMailStore.getState().isRefreshing).toBe(false);
+    assert.ok(requestedUrls.some((url) => url.includes("/api/mail/messages")));
+    assert.deepEqual(useMailStore.getState().messages, inbox);
+    assert.equal(useMailStore.getState().isRefreshing, false);
   });
 });
